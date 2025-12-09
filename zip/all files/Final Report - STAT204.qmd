@@ -1,0 +1,251 @@
+---
+title: "Reproducing and Extending: The Impact of COVID-19 on Music Consumption and Music Spending"
+author: "Jocelyn Chen"
+date: today
+format:
+  quarto-journals/elsevier-pdf:
+    keep-tex: false
+    include-in-header: elsevier-header.tex
+abstract: |
+bibliography: reference.bib
+---
+
+# Introduction
+
+## Research Questions and Project Objectives
+
+The COVID-19 pandemic represents an unprecedented shock to the global music industry. Government-imposed restrictions transformed consumer behavior across live and recorded music markets, which makes it important to understand how consumers adapted their spending and consumption patterns. This project reproduces and extends the analysis of Denk et al. (2022) [@denk2022] to address three primary research questions:
+
+1. How did COVID-19 influence total music spending and listening hours?
+2. How did the COVID-19 effects differ between live and recorded markets?
+3. Within the recorded market, how did spending shares shift across streaming, physical, and digital channels?
+
+The objectives of this project are threefold. First, I reproduced the main analyses from Denk et al. (2022) using R. Second, I critically evaluated the original paper's methodology, assumptions, and interpretations, identifying both strengths and areas for improvement. Third, I proposed and implemented extensions to the original analysis by: (1) investigating interaction effects between COVID-19 and listener characteristics (active listening and music taste mainstream-ness), and (2) examining wave-specific effects to identify potential pre-pandemic trends and differentiate between the two pandemic waves.
+
+## Background and Motivation
+
+The pandemic resulted in some interesting trends in the music industry: while live events faced near-complete shutdowns, consumers spent more time at home with increased access to recorded music. Understanding these dynamics is important for multiple reasons. First, the music industry is the the biggest entertainment sector in Germany, supporting not only artists and creating employment opportunities, but also promoting consumer well-being through creative engagement. Second, investigating the change in consumers' behavior can provide practical guidance for all stakeholders in the industry. Prior research, such as Carlson et al.'s [@carlson2021] initial insights on COVID-19's impact on music consumption, provided a foundation, but panel models used in Denk et al.'s work allow for more precise analysis of consumer behavior before and after the pandemic outbreak across different channels. The original paper offers a comprehensive view of impact of COVID-19 by examining both spending on music in euros and music consumption in listening hours.
+
+## Dataset
+
+The analyses utilizes data from an online panel study (German music study - musikstudie) initially established in winter 2018/2019 with 3,365 participants selected to represent the German population. The survey was conducted bi-annually through 2018-2021, resulting in five waves of panel data. The raw dataset contains 10,759 observations across 41 variables, with 3,908 unique participant IDs as new participants entered after the initial wave. For analyses in this project, I focus on a balanced panel of 594 participants who completed all five surveys, contributing 2,970 total observations. The dataset includes 28 numerical variables (5 of which can be analyzed as factors) and 13 character variables (11 can be analyzed as factors, 2 as dates). Key variable categories include:
+
+- **Music behavior**: Listening hours per week (music consumption) and monthly spending in euros (music spending)
+- **Market segments**: Live music, and recorded music (streaming, physical, digital)
+- **Demographics**: Age, gender, education, income, household composition
+- **Engagement**: Musical activities (e.g., instrument playing, music education)
+
+# Exploratory Data Analysis
+
+## Summary Statistics
+
+[The Summary Statistics Table](https://github.com/choochoojc/Musikstudie/blob/00f7c9c468a4e2abf1fe3ac2bafd2419ae715ab6/Results%20and%20Table/Summary%20Statistics.csv) reproduced based on the original paper presents the descriptive summary for the key dependent and control variables across all five waves, and shows several important patterns in the data. Overall spending and consumption decreased substantially after the pandemic onset. However, within the recorded market, spending on streaming subscriptions increased, while spending on digital downloads and physical music declined. These patterns suggest a potential acceleration of the digitalization trend in music consumption. There is also a seasonal pattern in live music consumption, with higher listening hours during summer months (waves 2 and 4 occurred in summer periods). This suggests that time-varying effects should be controlled in the statistical models. The control variables show generally stable patterns before and after COVID-19 restrictions, with only a few exceptions such as music appreciation, and music education, purchase reasons, etc. 
+
+## Data Quality Assessment
+
+### Skewed Dependent Variables
+
+![Distribution of Music Spending](1_spending_distribution.png){#fig-1}
+
+![Distribution of Music Consumption](1_consumption_distribution.png){#fig-2}
+
+The distribution of music spending and consumption distributions shows substantial right-skewness, with many zero values and a long tail of high-spending/high-consumption individuals. Therefore, log transformation was adopted to handle the skewness. The transformed variables have distributions much closer to normality which is important for model fitting. @fig-1 and @fig-2 show distributions of the dependent variables before and after log transformation. 
+
+### Missing Values
+
+The balanced panel strategy in the original paper (participants completing all five waves) naturally addresses missing data concerns at the observation level. There are no missing values in the key variables of interest in the balanced panel.
+
+## Preliminary Insights
+
+The exploratory analysis reveals several patterns that inform modeling choices:
+
+1. **Log transformation**: The right-skewed distributions of spending and consumption variables support the use of log-linear models, which is consistent with the original paper's approach.
+2. **Fixed effect models**: The longitudinal setup suggests that fixed effects models will be valuable for controlling time-invariant heterogeneity.
+3. **Temporal changes**: The presence of seasonal patterns and potential pre-pandemic trends (visible in waves 2 and 3) motivates my extension to wave-specific effects.
+4. **Different in market segments**: Different trends between live and recorded markets, and within recorded submarkets, shows the importance of the investigation of COVID-19 effects across different markets/channels.
+
+# Methods
+
+## Fixed Effects Panel Model
+
+Panel data analysis allows researchers to capture both temporal dynamics and individual-specific heterogeneity [@wooldridge2010]. Furthermore, fixed effects models are particularly valuable for making inferences where unobserved heterogeneity might bias estimates. For the research questions examining COVID-19's impact on music consumption and spending, I used fixed effects panel models following the original paper's specification [@wooldridge2010]:
+
+$$log(y_{kit}+1) = \alpha_i + \beta \cdot \text{COVID}_{it} + X_{it}'\gamma + \varepsilon_{it}$$
+
+where:
+
+- $y_{kit}$ is the outcome for individual $i$ in wave $t$ and market $k$ (total market, live market, and recorded market). The transformation makes it possible to handle the skewed data and the zero values.
+- $\alpha_i$ represents individual fixed effects
+- $\text{COVID}_{it}$ is a binary indicator for pandemic period (0 if waves 1, 2, 3; 1 if waves 4 and 5)
+- $X_{it}$ contains time-varying covariates
+- $\varepsilon_{it}$ is the random error term
+
+Music spending and consumption are greatly different across individuals due to unobserved factors such as intrinsic musical taste, personality traits, and exact level of musical involvement. These characteristics are difficult or impossible to measure directly but greatly influence consumers' behavior. Fixed effects models address this challenge by controlling for all time-invariant personal differences through the individual-specific intercept $\alpha_i$, comparing each person to themselves over time. This within-individual-transformation removes all unobserved traits that remain constant, making the COVID coefficient more credibly interpretable as an unbiased estimate. Robust standard errors are clustered at the individual level to account for repeated observations within individuals [@petersen2009].
+
+## Fractional Multinomial Logit Model
+
+For the research question examining spending share shifts within the recorded market, I used a fractional multinomial logit (FML) model [@papke1996] following the authors' original approach. The specification ensures that shares fall within the [0,1] interval and sum to one:
+
+$$E[s_{ijt}|X_{it}] = \frac{\exp(X_{it}'\beta_j)}{\sum_{k=1}^{J} \exp(X_{it}'\beta_k)}$$
+
+where:
+
+- $s_{ijt}$ represents the share of recorded music channel $j$ for individual $i$ at time $t$
+- $J$ indexes the channels (streaming, physical, digital, radio, etc.)
+- $X_{it}$ contains covariates including the COVID indicator
+
+The fractional multinomial logit model is particularly appropriate for this research question for several reasons. Unlike models like Dirichlet regression, the FML model appropriately handles corner solutions where individuals allocate 0% or 100% to a single channel, which is common in music spending and consumption data. For example, some individuals exclusively use one channel (e.g., only streaming). Moreover, the multinomial logit transformation ensures all predicted shares lie between 0 and 1 and sum to unity, respecting the natural constraints of share data. Average partial effects (APEs) were reported, which represent the average change in each channel's share associated with COVID-19 across all individuals in the data. These APEs are estimated using simulation-based methods in the R package fmlogit.
+
+## Extensions to the Original Analysis
+
+### Extension 1: Additional Interaction Effects
+
+The original paper investigated heterogeneity of COVID-19 effect based on only some demographic characteristics (such as age, gender, etc) and musical involvement (music education and appreciation). I extended this by modeling additional interactions between COVID-19 and two other key behavioral characteristics:
+
+1. **Active listening**: Whether the individual engages in focused listening (vs. background music)
+2. **Music taste mainstream-ness**: Whether preferences align with popular/mainstream genres
+
+These extensions test whether the pandemic's impact varied systematically by engagement level and taste profile. The modified specification becomes:
+
+$$log(y_{kit} + 1) = \alpha_i + \beta_1 \cdot \text{COVID}_{it} + \beta_2 \cdot \text{COVID}_{it} \times \text{Characteristic}_{it} + X_{it}'\gamma + \varepsilon_{it}$$
+
+### Extension 2: Wave-Specific Effects
+
+Rather than treating COVID as a simple binary variable (pre for waves 1, 2, 3 vs. during for waves 4 and 5), I estimated wave-specific effects to examine:
+
+- Whether pre-pandemic trends exist (waves 2-3 relative to wave 1)
+- Whether pandemic effects differ between early (wave 4) and later (wave 5) periods
+
+The specification uses wave indicators:
+
+$$y_{kit} = \alpha_i + \sum_{w=2}^{5} \beta_w \cdot \text{Wave}_{w,it} + X_{it}'\gamma + \varepsilon_{it}$$
+
+
+## Software and Implementation
+
+All analyses are conducted in R version 4.5.1 using the following packages:
+
+- fixest [@berge2018fixest]: Fixed effects estimation with robust standard errors
+- fmlogit [@ji2022fmlogit]: Fractional multinomial logit models
+- tidyverse [@wickham2019tidyverse], dplyr [@wickham2025dplyr]: Data manipulation and preparation
+- ggplot2 [@wickham2016ggplot2], patchwork [@pedersen2025patchwork]: Visualization
+- readxl [@wickham2025readxl], openxlsx [@schauberger2025openxlsx]: Data import/export
+
+The original paper used the software Stata for all analyses. I used Claude AI, GROK AI, and ChatGPT to translate the authors' Stata code to R for data cleaning and summary statistics.
+
+# Results
+
+## Reproduction Assessment
+
+The results of my reproduction were consistent with the original paper's finding. The consistency across software platforms strengthens confidence in the robustness of the main conclusions. However, there were some technical limitations:
+
+**Fractional Multinomial Logit**: The R package fmlogit uses different optimization algorithms than Stata's implementation, with choices including conjugate gradients (CG) or Berndt-Hall-Hall-Hausman (BHHH). This creates several sources of potential discrepancy:
+
+1. **Optimization differences**: Different algorithms may converge to slightly different local maxima in likelihood. Setting random seeds creates additional uncertainty in the optimization process.
+2. **Standard error estimation**: The fmlogit package in R uses simulation-based Krinsky-Robb methods for estimating standard errors of average partial effects, while Stata uses the empirical delta method. Although these approaches are asymptotically equivalent, finite-sample differences can occur.
+3. **Numerical precision**: Minor differences in floating-point arithmetic across platforms can accumulate through iterative optimization.
+
+Despite these technical differences, my replicated estimates fall within the confidence intervals of the original results, and all conclusions remain unchanged. The average partial effects show the same signs, similar magnitudes, and consistent statistical significance patterns.
+
+## Critical Evaluation of Original Paper
+
+### Strengths
+
+As described in the method section, the statistical models used in the original analyses are fit for the purpose of the data from both practical and technical perspectives.
+
+Furthermore, the authors conducted comprehensive robustness checks that further strengthen their conclusions:
+
+1. **Population reweighting**: Testing sensitivity to sample by reweighting to match with population demographics
+2. **Unbalanced panel analysis**: Testing if results hold when including participants with incomplete responses
+3. **Fixed vs. random effects**: Testing the appropriateness of the fixed effects specification
+4. **Heterogeneity analysis via interactions**: Examining differente effects across gender, age, music education, and music appreciation subgroups
+
+These sensitivity analyses show the findings of the paper are robust against different data specifications and model assumptions.
+
+### Areas for Improvement
+
+**Mischaracterization of Model Fit**: The authors claimed that "The overall Wald-$\chi^2$ test statistic for consumer spending is 732.30 (p<0.001) and 765.37 (p<0.001) for music consumption, both indicating a good explanatory power of the models." This interpretation is incorrect. The Wald test evaluates whether the chosen covariates are jointly significant, not how much variation in outcomes the model explains. 
+
+**Limited Interaction Analysis**: While the authors explored some heterogeneity through interactions, they did not systematically examine whether COVID's impact depends on active listening engagement or music taste characteristics. My extensions address this gap.
+
+**Binary COVID Coding**: Coding COVID as a simple pre/post-pandemic binary may ignore important dynamics such as pre-pandemic trends or difference in effects across the two pandemic waves. My wave-specific analysis provides more temporal insights.
+
+## Main Results: COVID-19 Impact on Consumption and Spending
+
+The full fixed-effects estimation outputs, including coefficient estimates, standard errors, confidence intervals, and p-values are provided in the [results table](https://github.com/choochoojc/Musikstudie/blob/fd36b7830863b864219979b1d867391d222ae9c9/Results%20and%20Table/FE_model_results_detailed.xlsx). To improve readability and focus on the COVID-19 effects, @fig-3 visualizes the estimated COVID-19 effects across different music spending and consumption market segments.
+
+The COVID-19 effects were quantified using the Halvorsen-Palmquist transformation [@halvorsen1980], which converts log-scale coefficients to percentage changes. 
+
+![Fixed Effects Model Results](2_FE_models.png){#fig-3}
+
+All COVID-19 effects are statistically significant at the 0.05 level:
+
+**Total Market Effects**: Total spending decreased by approximately 39.1% during COVID compared to pre-pandemic. Total consumption decreased by approximately 13.3% despite increased time at home
+
+**Live Market Effects** (most severely impacted): Live spending decreased by approximately 46.8% while live consumption decreased by approximately 13.4%
+
+**Recorded Market Effects** (smaller but still meaningful): Recorded spending decreased by approximately 13.8% while recorded consumption decreased by approximately 11.5%
+
+These results align closely with the original paper's finding that COVID significantly reduced total and live music spending/consumption,
+with smaller but meaningful declines in recorded markets. The decrease in consumption even when people are able to spend more time at home suggests that music consumption could accompany other social activities (commuting, social gatherings) that were restricted during lockdowns.
+
+## Share Shifts Within Recorded Market
+![Average Partial Effects from Fractional Multinomial Logit](3_APE.png){#fig-4}
+
+The fractional multinomial logit results indicate reallocation in the recorded music market during COVID-19. As shown in @fig-4, the pandemic drastically shifted spending and listening shares toward digital platforms. Premium streaming shows the strongest growth, increasing by 4.2% in spending and 3.4% in consumption, along with a smaller gain in online radio consumption of 1.2%. In contrast, more traditional formats suffered declines in market share: physical formats fell by 7.4% in spending and 0.7% in consumption, digital downloads decreased by 1.1% in both spending and consumption, and traditional radio spending dropped by 4.9%. 
+
+These patterns demonstrate that the pandemic accelerated the continuous trend toward digitalization of the music industry, with premium streaming being the most postively impacted channel. The shift away from physical formats is likely a victim of social distancing - retails being shut down and people not going out and purchasing. The decline in traditional radio consumption may reflect reduced commuting time.
+
+## Extension 1: Interaction Effects
+
+The full interaction effect estimation outputs, including coefficient estimates, standard errors, confidence intervals, and p-values are provided in the [interaction results table](https://github.com/choochoojc/Musikstudie/tree/8f084497aa3cafc3cfca4db3333da3ad3a484862/Results%20and%20Table). To improve readability and focus on the COVID-19 effects, @fig-5 visualizes the estimated **COVID-19 * listener profiles** interaction effects for both activeness and music taste.
+
+My extended interaction analysis reveals important heterogeneity in COVID's impact:
+
+**Active Listening**: Overall, active listeners are more negatively impacted by the pandemic, compared to those who do not listen as much, with more prominent and statistically significant declines in the live music scene. The COVID × Active Listener interaction is negative and statistically significant for live music spending ($\beta$ = -0.52, p < 0.05) and consumption ($\beta$ = -0.15, p < 0.05)
+
+**Music Taste**: Overall, listeners with less mainstream music taste are more negatively impacted by the pandemic, with more prominent and statistically significant declines in the live music scene. The COVID × Main Stream interaction is negative and statistically significant for live music spending ($\beta$ = -0.4, p < 0.05) and consumption ($\beta$ = -0.1, p < 0.05)
+
+**Interpretation**: These findings suggest that the pandemic affected listeners with different listening characteristics differently, especially for live music market. Active music listeners and those with niche tastes may have benefited more from live experiences that are just not the same with recorded music. 
+
+![Interaction Effects: COVID × Listener Profiles](4_interaction_combined.png){#fig-5}
+
+## Extension 2: Wave-Specific Effects
+
+The full wave-specifc effect estimation outputs, including coefficient estimates, standard errors, confidence intervals, and p-values are provided in the [wave-specific results table](https://github.com/choochoojc/Musikstudie/blob/main/Results%20and%20Table/Extended_wave_effects.xlsx). To improve readability, @fig-6 visualizes the estimated wave-specific effects, specifically the percentage changes compared to wave 1.
+
+
+![Wave-Specific Effects Over Time](5_wave_specific_effect.png){#fig-6}
+
+The wave-specific analysis shows several surprising patterns. Before the onset of COVID-19, there were already downward trends in both music spending and consumption. Total consumption declined significantly in the pre-pandemic period, falling by approximately **5% in wave 2** and **9% in wave 3**, and recorded market spending also shows marginal decreases across these early waves.
+
+During the pandemic, the estimated effects differ notably between **wave 4 (early pandemic, summer 2020)** and **wave 5 (later pandemic, winter 2020/21)**, suggesting that behavioral changes to COVID-19 shifts over time.
+
+**Implications**: The existence of pre-pandemic declining trends suggests that there are other factors than COVID-19 that impacted music engagement, such as competition from alternative entertainments like podcasts. The differential effects between waves 4 and 5 indicate consumers' adaptation to the pandemic over time.
+
+# Discussion and Conclusion
+
+## Answers to Research Questions
+
+This project reproduced and extended the analysis of COVID-19’s impact on music engagement in Germany. **Total music spending declined by more than 45%** and **total music consumption dropped by around 13%**. The impact varied by market with recorded market having the smaller but still meaningful decline. Within the recorded market, the pandemic accelerated **digitalization**, with premium streaming gaining share and physical formats and downloads declining.
+
+## Practical Implications
+
+These findings can provide guidance for the music industry. Labels and artists can better construct contracts and plan music releases, streaming platforms can optimize their services, and event organizers can make informed decisions about event scale and format to cater to the new audience preferences post-pandemic. 
+
+## Improvements Over the Original Paper
+
+The original paper used a binary COVID-19 indicator and had limited interaction analysis. My wave-specific models reveal **consumption declines even before COVID-19**, indicating that there might be other factors than the pandemic that impact consumers' behaviour towards music. Analyses investigating additional interaction effects further show that **active listeners and non-mainstream consumers were more negatively impacted**, showing heterogeneity in COVID-19 effect.
+
+## Limitations
+
+Although fixed effects models can strengthen causal interpretation by removing time-invariant unobserved heterogeneity, they do not provide causal interpretation of COVID-19’s impact on music behavior based on the scope of this paper. The results of this project only reflect associations with pandemic conditions rather than definitive causal effects. 
+
+The online, self-reported panel data introduce consistent biases, particularly toward more digitally active and more musically engaged participants who remain in the panel for over 3 years. Therefore, the findings should probably be best interpreted as generalizable to engaged German music consumers rather than the entire population.
+
+## Future Directions
+
+There are many opportunities to further expand this work. **Generalization** beyond Germany would clarify if similar market shifts occurred in other countries. A **post-pandemic trajectory analysis** could determine whether changes persisted, reversed, or amplified after COVID restrictions were lifted. Finally, integrating consumer survey responses with **richer data sources** such as streaming logs, ticket sales, or release schedules would help further identify COVID impact on music industry.
+
+# Supplementary Materials
+All relevant data can be found in the repository [here](https://www.fdr.uni-hamburg.de/record/10159#.YmlnzNpBwSE). R code needed to replicate this final project can be found [here](https://github.com/choochoojc/Musikstudie/tree/2c62ae9836a4bb058629e9d59d61cc709aa2e769/R%20Code). Detailed numerical results of the models can be found [here](https://github.com/choochoojc/Musikstudie/tree/2c62ae9836a4bb058629e9d59d61cc709aa2e769/Results%20and%20Table)
