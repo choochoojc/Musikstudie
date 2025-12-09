@@ -1,0 +1,1 @@
+This folder includes all r code files needed to replicate the results of this final project. "1_Data_Cleaning.R" contains r code translated from STATA code in the original paper using LLMs as described in the final report. Some of the rest of the files are reformatted using Claude AI for better readability.
