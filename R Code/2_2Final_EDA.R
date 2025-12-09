@@ -117,5 +117,5 @@ consumption_dist <- consumption / log_consumption +
   ) &
   theme(plot.title = element_text(size = 16, face = "bold", hjust = 0.5))
 
-ggsave("consumption_distribution.png", spending_dist,
+ggsave("consumption_distribution.png", consumption_dist,
        width = 10, height = 5, dpi = 300)
